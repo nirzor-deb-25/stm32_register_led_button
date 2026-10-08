@@ -1,0 +1,60 @@
+#include <stdint.h>
+
+#define REG32(address) (*(volatile uint32_t *)(address))
+
+#define RCC_AHB1ENR   REG32(0x40023830U)
+
+/* GPIOA: USER button on PA0 */
+#define GPIOA_MODER   REG32(0x40020000U)
+#define GPIOA_PUPDR   REG32(0x4002000CU)
+#define GPIOA_IDR     REG32(0x40020010U)
+
+/* GPIOD: green LED on PD12 */
+#define GPIOD_MODER   REG32(0x40020C00U)
+#define GPIOD_OTYPER  REG32(0x40020C04U)
+#define GPIOD_OSPEEDR REG32(0x40020C08U)
+#define GPIOD_PUPDR   REG32(0x40020C0CU)
+#define GPIOD_BSRR    REG32(0x40020C18U)
+
+#define LED_PIN    12U
+#define BUTTON_PIN 0U
+
+int main(void)
+{
+    /* Enable clocks for GPIOA and GPIOD */
+    RCC_AHB1ENR |= (1U << 0) | (1U << 3);
+    (void)RCC_AHB1ENR;
+
+    /* Start with the LED off */
+    GPIOD_BSRR = (1U << (LED_PIN + 16U));
+
+    /* PD12: output mode */
+    GPIOD_MODER &= ~(3U << (LED_PIN * 2U));
+    GPIOD_MODER |=  (1U << (LED_PIN * 2U));
+
+    /* Push-pull, low speed, no pull resistors */
+    GPIOD_OTYPER  &= ~(1U << LED_PIN);
+    GPIOD_OSPEEDR &= ~(3U << (LED_PIN * 2U));
+    GPIOD_PUPDR   &= ~(3U << (LED_PIN * 2U));
+
+    /* PA0: input mode */
+    GPIOA_MODER &= ~(3U << (BUTTON_PIN * 2U));
+
+    /* PA0: pull-down, giving a low level when released */
+    GPIOA_PUPDR &= ~(3U << (BUTTON_PIN * 2U));
+    GPIOA_PUPDR |=  (2U << (BUTTON_PIN * 2U));
+
+    while (1)
+    {
+        if ((GPIOA_IDR & (1U << BUTTON_PIN)) != 0U)
+        {
+            /* Button pressed: LED on */
+            GPIOD_BSRR = (1U << LED_PIN);
+        }
+        else
+        {
+            /* Button released: LED off */
+            GPIOD_BSRR = (1U << (LED_PIN + 16U));
+        }
+    }
+}

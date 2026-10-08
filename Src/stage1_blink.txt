@@ -1,0 +1,55 @@
+#include <stdint.h>
+
+/* Direct access to hardware registers */
+#define REG32(address) (*(volatile uint32_t *)(address))
+
+#define RCC_AHB1ENR   REG32(0x40023830U)
+
+#define GPIOD_MODER   REG32(0x40020C00U)
+#define GPIOD_OTYPER  REG32(0x40020C04U)
+#define GPIOD_OSPEEDR REG32(0x40020C08U)
+#define GPIOD_PUPDR   REG32(0x40020C0CU)
+#define GPIOD_BSRR    REG32(0x40020C18U)
+
+#define GREEN_LED_PIN 12U
+
+/* Approximate delay for the initial blink test */
+static void delay(void)
+{
+    for (volatile uint32_t i = 0; i < 1000000U; i++)
+    {
+        __asm volatile ("nop");
+    }
+}
+
+int main(void)
+{
+    /* 1. Enable the clock for GPIO port D */
+    RCC_AHB1ENR |= (1U << 3);
+
+    /* Allow the clock enable to take effect */
+    (void)RCC_AHB1ENR;
+
+    /* 2. Start with the green LED off */
+    GPIOD_BSRR = (1U << (GREEN_LED_PIN + 16U));
+
+    /* 3. Configure PD12 as a general-purpose output: 01 */
+    GPIOD_MODER &= ~(3U << (GREEN_LED_PIN * 2U));
+    GPIOD_MODER |=  (1U << (GREEN_LED_PIN * 2U));
+
+    /* Push-pull output, low speed, no pull-up/pull-down */
+    GPIOD_OTYPER  &= ~(1U << GREEN_LED_PIN);
+    GPIOD_OSPEEDR &= ~(3U << (GREEN_LED_PIN * 2U));
+    GPIOD_PUPDR   &= ~(3U << (GREEN_LED_PIN * 2U));
+
+    while (1)
+    {
+        /* LED on */
+        GPIOD_BSRR = (1U << GREEN_LED_PIN);
+        delay();
+
+        /* LED off */
+        GPIOD_BSRR = (1U << (GREEN_LED_PIN + 16U));
+        delay();
+    }
+}

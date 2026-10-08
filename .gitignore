@@ -1,0 +1,21 @@
+# Generated build folders
+Debug/
+Release/
+
+# Compiled files
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.su
+*.cyclo
+
+# Workspace metadata
+.metadata/
+
+# Operating system files
+Thumbs.db
+.DS_Store
