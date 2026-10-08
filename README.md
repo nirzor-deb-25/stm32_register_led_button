@@ -1,169 +1,208 @@
-
-
 # STM32 Register-Level LED and Button Patterns
 
-A learning project using the STM32F407G-DISC1 development board.
-The application controls onboard LEDs and detects button gestures
-through direct register access, without HAL.
-
+A project using the **STM32F407G-DISC1** development board to control LEDs and detect button gestures through direct register access, without HAL.
 
 ## Demo
 
-Single click selects slow blinking, double click selects fast blinking,
-and a long press keeps the green LED on.
+[Watch the project demo](demo_compressed.mp4)
 
+The video demonstrates slow blinking, fast blinking, and a steady LED controlled by button gestures.
 
+## Features
 
-
+- Direct GPIO register configuration
+- Button debouncing
+- Single-click, double-click, and long-press detection
+- SysTick-based timing
+- Nonblocking LED control
+- Standalone operation after programming
 
 ## Hardware and Tools
 
 - STM32F407G-DISC1 development board
-- USB data cable connected to the ST-LINK port
-- STM32CubeIDE 2.2.0
+- USB connection to the onboard ST-LINK
+- STM32CubeIDE
 - GNU Arm toolchain supplied with STM32CubeIDE
+- Git and GitHub
 
-No external wiring is required.
+No external components or wiring are required.
 
 ## Pin Mapping
 
-| Component | MCU pin | Behavior |
+| Component | MCU pin | Function |
 |---|---|---|
-| Green LED, LD4 | PD12 | High turns the LED on |
-| Blue LED, LD6 | PD15 | High turns the LED on |
-| Blue USER button, B1 | PA0 | High when pressed |
+| Green LED — LD4 | PD12 | Displays the selected LED pattern |
+| Blue LED — LD6 | PD15 | Indicates a debounced button press |
+| USER button — B1 | PA0 | Selects the LED pattern |
 
-## Features
+The LEDs turn on when their GPIO outputs are high. The USER button reads high when pressed.
 
-- Basic LED blink checkpoint
-- Button-controlled LED checkpoint
-- SysTick timing through direct register access
-- Software button debouncing
-- Single-click, double-click and long-press detection
-- LED patterns that run while button input is monitored
-- Standalone operation after disconnecting the debugger
+## Button Controls
 
-## Final Behavior
-
-| Action | Result |
+| Action | Green LED behavior |
 |---|---|
-| Reset or power on | Green and blue user LEDs start off |
-| Single short click | Green LED blinks slowly |
-| Double short click | Green LED blinks quickly |
-| Hold for at least one second | Green LED stays on |
-| Single click after long press | Green returns to slow blinking |
-| Hold USER button | Blue LED indicates the debounced pressed state |
+| Single click | Slow blinking |
+| Double click | Fast blinking |
+| Hold for at least one second | Stays on after release |
+| Single click after steady-on mode | Returns to slow blinking |
 
-The single-click action waits approximately 350 ms after release
-to determine whether a second press follows.
-
-A double click requires the second debounced press to occur within
-350 ms of the first debounced release. Releasing the second short
-press selects fast blinking.
+The blue LED follows the debounced button state.
 
 ## Timing
 
-The project retains the STM32 reset clock configuration:
-the internal 16 MHz HSI clock supplies the processor.
-
-SysTick reload is set to 15999, producing a nominal 1 ms tick.
-The program polls COUNTFLAG and does not enable SysTick interrupts.
-
-| Setting | Value |
+| Parameter | Value |
 |---|---|
-| Debounce interval | 20 ms |
-| Double-click window | 350 ms |
+| SysTick interval | Approximately 1 ms |
+| Debounce time | 20 ms |
+| Double-click window | 350 ms after the first release |
 | Long-press threshold | 1000 ms |
 | Slow blink | 500 ms on, 500 ms off |
 | Fast blink | 100 ms on, 100 ms off |
 
-Timing accuracy depends on the internal oscillator.
+A single click is confirmed after the double-click window expires, so its response includes a short delay.
 
-## Registers Used
+## How It Works
+
+### GPIO configuration
+
+The program enables the GPIOA and GPIOD peripheral clocks through the RCC registers.
+
+PD12 and PD15 are configured as outputs for the onboard LEDs. PA0 is configured as an input for the USER button.
+
+LED outputs are controlled through the GPIO bit set/reset register, `BSRR`.
+
+### SysTick timing
+
+The program uses the default 16 MHz HSI clock.
+
+SysTick is configured with a reload value of `15999`, producing an approximately 1 ms interval. The main loop polls the SysTick `COUNTFLAG` to maintain a software millisecond counter.
+
+This implementation does not use a SysTick interrupt.
+
+### Button debouncing
+
+A change in the raw button input must remain stable for 20 ms before it becomes an accepted button-state change.
+
+This reduces false events caused by mechanical contact bounce.
+
+### Gesture detection
+
+The program tracks button presses and releases to distinguish:
+
+- A single short click
+- Two short clicks within the double-click window
+- A press held for at least one second
+
+The detected gesture selects the green LED mode.
+
+### Nonblocking LED patterns
+
+The program checks elapsed time to decide when to change the LED output.
+
+The final application uses no blocking delay loops, allowing button processing to continue while the LED blinks.
+
+Unsigned time differences are used to handle counter wraparound.
+
+## Main Registers
 
 | Register | Address | Purpose |
 |---|---|---|
-| RCC_AHB1ENR | 0x40023830 | Enable GPIOA and GPIOD clocks |
-| GPIOA_MODER | 0x40020000 | Configure PA0 as an input |
-| GPIOA_PUPDR | 0x4002000C | Configure PA0 pull-down |
-| GPIOA_IDR | 0x40020010 | Read the USER button |
-| GPIOD_MODER | 0x40020C00 | Configure PD12 and PD15 as outputs |
-| GPIOD_OTYPER | 0x40020C04 | Select push-pull outputs |
-| GPIOD_OSPEEDR | 0x40020C08 | Select low output speed |
-| GPIOD_PUPDR | 0x40020C0C | Disable LED pin pull resistors |
-| GPIOD_BSRR | 0x40020C18 | Set or reset LED outputs |
-| SysTick CTRL | 0xE000E010 | Enable timer and read COUNTFLAG |
-| SysTick LOAD | 0xE000E014 | Set timer reload value |
-| SysTick VAL | 0xE000E018 | Clear current counter value |
+| RCC_AHB1ENR | `0x40023830` | Enables GPIO peripheral clocks |
+| GPIOA_MODER | `0x40020000` | Configures button pin mode |
+| GPIOA_PUPDR | `0x4002000C` | Configures input pull resistors |
+| GPIOA_IDR | `0x40020010` | Reads the USER button |
+| GPIOD_MODER | `0x40020C00` | Configures LED pin modes |
+| GPIOD_OTYPER | `0x40020C04` | Configures output type |
+| GPIOD_OSPEEDR | `0x40020C08` | Configures output speed |
+| GPIOD_PUPDR | `0x40020C0C` | Configures output pull resistors |
+| GPIOD_BSRR | `0x40020C18` | Sets and resets LED outputs |
+| SysTick_CTRL | `0xE000E010` | Controls SysTick and reads COUNTFLAG |
+| SysTick_LOAD | `0xE000E014` | Sets the reload value |
+| SysTick_VAL | `0xE000E018` | Clears the current counter value |
 
-Register access uses volatile uint32_t pointers.
+Registers are accessed using volatile 32-bit pointers.
 
-BSRR bits 0–15 set output pins.
-BSRR bits 16–31 reset output pins.
+## Project Files
 
-## Program Structure
+| File or folder | Description |
+|---|---|
+| `Src/main.c` | Final LED patterns and button gesture application |
+| `Src/stage1_blink.txt` | Saved basic LED blink implementation |
+| `Src/stage2_button.txt` | Saved button-controlled LED implementation |
+| `Src/stage3_patterns.txt` | Saved LED patterns implementation |
+| `Src/syscalls.c` | Toolchain system-call support |
+| `Src/sysmem.c` | Toolchain memory support |
+| `Startup/` | MCU startup code |
+| `STM32F407VGTX_FLASH.ld` | Flash linker script |
+| `STM32F407VGTX_RAM.ld` | RAM linker script |
+| `.project` and `.cproject` | STM32CubeIDE project configuration |
+| `demo_compressed.mp4` | Hardware demonstration video |
 
-- main(): configures GPIO and SysTick, then processes button input.
-- green_write(): switches the green LED on or off.
-- set_mode(): selects a pattern and resets its timing.
-- pattern_tick(): advances the active blinking pattern.
-
-Debouncing accepts an input change only after it remains stable
-for 20 ms. Gesture detection uses the debounced press and release
-events.
+The `.txt` files are learning checkpoints and are not compiled into the application.
 
 ## Build and Run
 
-1. Open the project in STM32CubeIDE.
-2. Select Build Project.
-3. Connect the board through its ST-LINK USB port.
-4. Select Debug As → STM32 C/C++ Application.
-5. Use ST-LINK with the SWD interface.
-6. Resume execution with F8 when paused at main().
-7. Test the blue USER button.
+1. Clone this repository:
 
-After flashing, the program also starts when the board is powered
-without an active debugging session.
+   ```bash
+   git clone https://github.com/nirzor-deb-25/stm32_register_led_button.git
+   ```
 
-## Manual Test Results
+2. Open STM32CubeIDE.
+
+3. Select **File → Import → General → Existing Projects into Workspace**.
+
+4. Select the cloned repository folder and import the project.
+
+5. Connect the board through its onboard ST-LINK USB connector.
+
+6. Build the project using **Project → Build Project**.
+
+7. Start a Debug session using the onboard ST-LINK.
+
+8. If execution pauses at `main()`, press **F8** to resume.
+
+9. Test the gestures using the blue **USER button**, not the reset button.
+
+After programming, the application can run without an active debugger. Disconnect and reconnect USB power to test standalone operation.
+
+## Hardware Test Results
+
+The following tests were performed manually on the board:
 
 | Test | Result |
 |---|---|
-| Initial green LED blink | Passed |
-| LED follows button press and release | Passed |
-| Timer blink runs alongside button input | Passed |
-| Single click selects slow blink | Passed |
-| Double click selects fast blink | Passed |
-| Long press selects steady on | Passed |
-| Single click restores slow blink | Passed |
-| Gestures work after USB power cycle | Passed |
+| Basic LED blinking | Passed |
+| Button-controlled LED | Passed |
+| SysTick timing test | Passed |
+| Single click selects slow blinking | Passed |
+| Double click selects fast blinking | Passed |
+| Long press selects steady-on mode | Passed |
+| Single click restores slow blinking | Passed |
+| Operation after USB power reconnection | Passed |
 
-These results come from manual testing on the development board.
-Debouncing is implemented, but electrical bounce waveforms were
-not measured.
+The project built with **0 errors and 0 warnings**.
 
 ## Limitations
 
-- SysTick is polled. If the loop takes longer than one millisecond,
-  multiple elapsed ticks can collapse into one COUNTFLAG event.
-- Clock changes require updating the SysTick reload value.
-- Gesture thresholds are fixed in the source code.
-- No automated tests have been performed.
-- Only the green and blue user LEDs are used.
+- Timing depends on the accuracy of the internal HSI oscillator.
+- The SysTick configuration assumes a 16 MHz processor clock.
+- Polling COUNTFLAG can miss elapsed ticks if the main loop is delayed for longer than one SysTick interval.
+- Validation was performed manually; no automated tests or oscilloscope timing measurements were performed.
 
-## Learning Outcomes
+## What I Learned
 
-- GPIO clock enabling and pin configuration
-- Bit masking and direct hardware register access
-- Input reading through IDR
-- Output control through BSRR
-- SysTick configuration
-- Button debouncing and gesture detection
-- Nonblocking LED pattern logic
-- Building, flashing and debugging embedded C
+- Configuring GPIO through peripheral registers
+- Enabling peripheral clocks through RCC
+- Reading digital inputs and controlling digital outputs
+- Using SysTick for time-based application logic
+- Debouncing a mechanical button
+- Implementing button gestures with state-based logic
+- Building and debugging an embedded C application
+- Documenting and publishing a hardware project with Git
 
 ## References
 
-- ST UM1472: Discovery kit with STM32F407VG MCU user manual
-- ST RM0090: STM32F4 reference manual
-- ST PM0214: STM32 Cortex-M4 programming manual
+- [STM32F4 Discovery user manual — UM1472](https://www.st.com/resource/en/user_manual/um1472-discovery-kit-with-stm32f407vg-mcu-stmicroelectronics.pdf)
+- [STM32F4 reference manual — RM0090](https://www.st.com/resource/en/reference_manual/rm0090-stm32f405415-stm32f407417-stm32f427437-and-stm32f429439-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)
+- [Cortex-M4 programming manual — PM0214](https://www.st.com/resource/en/programming_manual/pm0214-stm32-cortexm4-mcus-and-mpus-programming-manual-stmicroelectronics.pdf)
