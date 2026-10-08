@@ -4,6 +4,16 @@ A learning project using the STM32F407G-DISC1 development board.
 The application controls onboard LEDs and detects button gestures
 through direct register access, without HAL.
 
+
+## Demo
+
+Single click selects slow blinking, double click selects fast blinking,
+and a long press keeps the green LED on.
+
+
+
+
+
 ## Hardware and Tools
 
 - STM32F407G-DISC1 development board
