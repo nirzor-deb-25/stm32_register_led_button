@@ -19,3 +19,5 @@ Release/
 # Operating system files
 Thumbs.db
 .DS_Store
+
+/Src/demo.mp4
